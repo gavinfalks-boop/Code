@@ -1,0 +1,576 @@
+<title>$15K MRR Thermometer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+<style>
+/* Layout: school-fundraiser poster. Big thermometer on the left, scoreboard + deal log on the right; stacks on phones.
+   Single deliberate light theme: classic red mercury on poster-white. */
+:root {
+  color-scheme: light;
+  --paper: #fffdf8;
+  --card: #ffffff;
+  --ink: #1d1a1a;
+  --muted: #6b6262;
+  --line: #e7dfd8;
+  --red: #d7261e;
+  --red-deep: #a8150f;
+  --red-soft: #fde4e1;
+  --glass: #f4f1ee;
+  --gold: #e6a417;
+  --green: #1f8a4c;
+  --display: "Bowlby One", "Arial Black", Impact, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+}
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-inline: 20px;
+  padding-block: 28px 48px;
+}
+header.top {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
+  border-bottom: 3px solid var(--ink);
+  padding-bottom: 14px; margin-bottom: 24px;
+}
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--red); font-weight: 700; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(30px, 5vw, 52px); line-height: 1; margin: 4px 0 0; text-wrap: balance; }
+h1 span { color: var(--red); }
+.deadline { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: right; }
+.deadline b { color: var(--ink); }
+
+.grid { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 32px; align-items: start; }
+@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+/* Thermometer */
+.thermo-col { display: flex; flex-direction: column; align-items: center; gap: 10px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+@media (max-width: 760px) { .thermo-col { position: static; } }
+.thermo { width: 100%; max-width: 320px; height: auto; display: block; }
+.thermo .tick { stroke: var(--ink); stroke-width: 2; }
+.thermo .tick.minor { stroke: var(--muted); stroke-width: 1; }
+.thermo .tlabel { font-family: var(--mono); font-size: 15px; font-weight: 700; fill: var(--ink); }
+.thermo .mlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; fill: var(--muted); }
+.thermo .star { fill: var(--line); stroke: var(--muted); stroke-width: 1.5; transition: fill .4s; }
+.thermo .star.hit { fill: var(--gold); stroke: var(--red-deep); }
+.thermo .mlabel.hit { fill: var(--red-deep); }
+.thermo .bulbtext { font-family: var(--display); font-size: 22px; fill: #fff; }
+.caption { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: center; }
+
+/* Scoreboard */
+.score { display: grid; gap: 4px; }
+.score .now { font-family: var(--display); font-size: clamp(48px, 9vw, 88px); line-height: .95; color: var(--red); font-variant-numeric: tabular-nums; }
+.score .of { font-family: var(--mono); font-size: 15px; color: var(--muted); }
+.score .of b { color: var(--ink); }
+.bar { height: 14px; border-radius: 7px; background: var(--glass); border: 2px solid var(--ink); overflow: hidden; margin-top: 10px; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--red); transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 22px; border: 2px solid var(--ink); border-radius: 10px; background: var(--card); overflow: hidden; }
+.stat { padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.stat + .stat { border-left: 2px solid var(--line); }
+.stat .k { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--display); font-size: clamp(20px, 3.2vw, 30px); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat .s { font-size: 12px; color: var(--muted); }
+@media (max-width: 460px) {
+  .stats { grid-template-columns: 1fr; }
+  .stat + .stat { border-left: 0; border-top: 2px solid var(--line); }
+}
+.pace { margin-top: 10px; font-size: 14px; }
+.pill { display: inline-block; font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.pill.ok { background: #dff3e7; color: var(--green); }
+.pill.behind { background: var(--red-soft); color: var(--red-deep); }
+
+section.block { margin-top: 30px; }
+section.block h2 { font-family: var(--display); font-weight: 400; font-size: 20px; margin: 0 0 10px; letter-spacing: .01em; }
+
+/* Form */
+form.add { background: var(--card); border: 2px solid var(--ink); border-radius: 12px; padding: 16px; display: grid; gap: 12px; box-shadow: 5px 5px 0 var(--red); }
+.row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; min-width: 0; }
+input { font: inherit; font-size: 16px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); width: 100%; }
+input:focus-visible { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+.money { position: relative; }
+.money::before { content: "$"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-weight: 700; }
+.money input { padding-left: 24px; font-variant-numeric: tabular-nums; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.quick span { font-size: 13px; color: var(--muted); }
+button { font: inherit; cursor: pointer; border-radius: 8px; }
+button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.chip { background: var(--glass); border: 2px solid var(--line); padding: 4px 12px; font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--ink); }
+.chip:hover { border-color: var(--red); }
+.primary { background: var(--red); color: #fff; border: 2px solid var(--ink); padding: 11px 18px; font-weight: 700; font-size: 16px; }
+.primary:hover { background: var(--red-deep); }
+.primary:disabled { opacity: .55; cursor: default; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.msg { font-size: 14px; color: var(--muted); }
+.msg.err { color: var(--red-deep); font-weight: 700; }
+.note { background: var(--glass); border-radius: 10px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
+
+/* Lists */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+ul.wins, ol.board { list-style: none; margin: 0; padding: 0; display: grid; }
+ul.wins li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); min-width: 0; }
+ul.wins li.fresh { animation: flash 2.4s ease-out; }
+@keyframes flash { from { background: var(--red-soft); } to { background: transparent; } }
+.who { font-weight: 700; overflow-wrap: anywhere; }
+.client { color: var(--muted); font-weight: 400; }
+.amt { font-family: var(--mono); font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; text-align: right; }
+.when { font-size: 12px; color: var(--muted); grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; font-size: 12px; }
+.linkbtn.danger { color: var(--red-deep); font-weight: 700; }
+ol.board li { display: grid; grid-template-columns: 28px 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; }
+.rank { font-family: var(--display); font-size: 18px; color: var(--muted); }
+ol.board li:first-child .rank { color: var(--gold); }
+.bname { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.bamt { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.btrack { grid-column: 2 / -1; height: 8px; border-radius: 4px; background: var(--glass); overflow: hidden; }
+.btrack i { display: block; height: 100%; background: var(--red); border-radius: 4px; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+
+/* Celebration banner */
+.banner {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 18px); transform: translate(-50%, -160%);
+  width: min(560px, calc(100% - 32px));
+  background: var(--red); color: #fff; border: 3px solid var(--ink); border-radius: 14px;
+  padding: 14px 18px; box-shadow: 6px 6px 0 var(--ink); z-index: 50;
+  transition: transform .5s cubic-bezier(.2,1.4,.4,1);
+  display: grid; gap: 2px; text-align: center;
+}
+.banner.show { transform: translate(-50%, 0); }
+.banner .big { font-family: var(--display); font-size: clamp(20px, 4vw, 28px); line-height: 1.1; }
+.banner .small { font-size: 15px; }
+@media (prefers-reduced-motion: reduce) {
+  .bar > i, .banner { transition: none; }
+  ul.wins li.fresh { animation: none; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Sales team · Q4 push</div>
+      <h1>Road to <span>$15,000</span> MRR</h1>
+    </div>
+    <div class="deadline">Deadline <b>Dec 31, 2026</b><br><span id="deadlineLeft">—</span></div>
+  </header>
+
+  <div class="grid">
+    <div class="thermo-col">
+      <svg class="thermo" id="thermo" viewBox="0 0 260 640" role="img" aria-labelledby="thermoTitle">
+        <title id="thermoTitle">Thermometer showing MRR progress toward $15,000</title>
+        <defs>
+          <clipPath id="tubeClip">
+            <rect x="113" y="40" width="34" height="500" rx="17"></rect>
+            <circle cx="130" cy="565" r="44"></circle>
+          </clipPath>
+          <linearGradient id="merc" x1="0" x2="1">
+            <stop offset="0" stop-color="#a8150f"></stop>
+            <stop offset=".45" stop-color="#e8382f"></stop>
+            <stop offset="1" stop-color="#b51b14"></stop>
+          </linearGradient>
+        </defs>
+        <!-- glass -->
+        <rect x="103" y="30" width="54" height="520" rx="27" fill="#ffffff" stroke="#1d1a1a" stroke-width="5"></rect>
+        <circle cx="130" cy="565" r="56" fill="#ffffff" stroke="#1d1a1a" stroke-width="5"></circle>
+        <rect x="108" y="500" width="44" height="30" fill="#ffffff"></rect>
+        <rect x="113" y="40" width="34" height="500" rx="17" fill="#f4f1ee"></rect>
+        <!-- mercury -->
+        <g clip-path="url(#tubeClip)">
+          <circle cx="130" cy="565" r="44" fill="url(#merc)"></circle>
+          <rect id="mercury" x="113" y="540" width="34" height="40" fill="url(#merc)"></rect>
+          <rect x="120" y="44" width="6" height="530" fill="#ffffff" opacity=".28"></rect>
+        </g>
+        <g id="ticks"></g>
+        <text class="bulbtext" x="130" y="573" text-anchor="middle" id="bulbPct">0%</text>
+      </svg>
+      <div class="caption">Each small tick is $500 MRR</div>
+    </div>
+
+    <main>
+      <div class="score">
+        <div class="eyebrow">Closed MRR so far</div>
+        <div class="now" id="total">—</div>
+        <div class="of">of <b>$15,000</b> goal · <span id="remainingText">—</span></div>
+        <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="k">Days left</span><span class="v" id="days">—</span><span class="s">until Dec 31</span></div>
+        <div class="stat"><span class="k">Needed / week</span><span class="v" id="perWeek">—</span><span class="s">to hit goal on time</span></div>
+        <div class="stat"><span class="k">Deals closed</span><span class="v" id="dealCount">—</span><span class="s" id="avgDeal">&nbsp;</span></div>
+      </div>
+      <div class="pace" id="pace"></div>
+
+      <section class="block" id="addBlock">
+        <h2>Log a closed deal</h2>
+        <form class="add" id="addForm" novalidate>
+          <div class="row">
+            <label for="amount">MRR added
+              <span class="money"><input id="amount" name="amount" type="number" inputmode="decimal" min="1" step="1" placeholder="500" required></span>
+            </label>
+            <label for="rep">Rep
+              <input id="rep" name="rep" type="text" maxlength="40" placeholder="Your name" autocomplete="name" required>
+            </label>
+            <label for="client">Client
+              <input id="client" name="client" type="text" maxlength="60" placeholder="Company name">
+            </label>
+          </div>
+          <div class="quick">
+            <span>Quick amounts:</span>
+            <button type="button" class="chip" data-amt="250">$250</button>
+            <button type="button" class="chip" data-amt="500">$500</button>
+            <button type="button" class="chip" data-amt="1000">$1,000</button>
+            <button type="button" class="chip" data-amt="2500">$2,500</button>
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary" id="submitBtn" disabled>Add to thermometer</button>
+            <span class="msg" id="formMsg">Connecting to the team board…</span>
+          </div>
+        </form>
+      </section>
+
+      <div class="two">
+        <section class="block">
+          <h2>Recent wins</h2>
+          <ul class="wins" id="wins"><li class="empty">Loading deals…</li></ul>
+        </section>
+        <section class="block">
+          <h2>Leaderboard</h2>
+          <ol class="board" id="board"><li class="empty">Loading…</li></ol>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="banner" id="banner" role="status" aria-live="polite">
+  <div class="big" id="bannerBig"></div>
+  <div class="small" id="bannerSmall"></div>
+</div>
+
+<script>
+(function () {
+  const GOAL = 15000;
+  const MILESTONES = [5000, 10000, 15000];
+  const DEADLINE = new Date(2026, 11, 31, 23, 59, 59);
+  const TUBE_TOP = 50, TUBE_BOTTOM = 520; // y for $15K and $0
+  const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => "$" + Math.round(n).toLocaleString("en-US");
+  const yFor = (v) => TUBE_BOTTOM - Math.min(v, GOAL) / GOAL * (TUBE_BOTTOM - TUBE_TOP);
+
+  // ---- Draw ticks & milestone stars
+  const NS = "http://www.w3.org/2000/svg";
+  const ticks = $("ticks");
+  function el(name, attrs, text) {
+    const e = document.createElementNS(NS, name);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  for (let v = 0; v <= GOAL; v += 500) {
+    const y = yFor(v);
+    const major = v % 2500 === 0;
+    ticks.appendChild(el("line", { x1: 160, x2: major ? 182 : 171, y1: y, y2: y, class: major ? "tick" : "tick minor" }));
+    if (major) ticks.appendChild(el("text", { x: 188, y: y + 5, class: "tlabel" }, v === 0 ? "$0" : "$" + (v / 1000) + "K"));
+  }
+  const starEls = {};
+  function starPath(cx, cy, r) {
+    let d = "";
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 ? r * 0.45 : r;
+      d += (i ? "L" : "M") + (cx + rr * Math.cos(a)).toFixed(1) + " " + (cy + rr * Math.sin(a)).toFixed(1);
+    }
+    return d + "Z";
+  }
+  MILESTONES.forEach((m) => {
+    const y = yFor(m);
+    ticks.appendChild(el("line", { x1: 74, x2: 100, y1: y, y2: y, class: "tick minor", "stroke-dasharray": "3 3" }));
+    const s = el("path", { d: starPath(60, y, 15), class: "star" });
+    const t = el("text", { x: 60, y: y + 30, "text-anchor": "middle", class: "mlabel" }, m === GOAL ? "GOAL" : "$" + m / 1000 + "K");
+    ticks.appendChild(s); ticks.appendChild(t);
+    starEls[m] = [s, t];
+  });
+
+  // ---- Mercury animation
+  let shownValue = 0, animFrom = 0, animTo = 0, animStart = 0;
+  const merc = $("mercury");
+  function setMercury(v) {
+    const y = yFor(v);
+    merc.setAttribute("y", y);
+    merc.setAttribute("height", 580 - y);
+  }
+  function animateTo(v) {
+    animFrom = shownValue; animTo = v; animStart = performance.now();
+    if (reduceMotion) { shownValue = v; setMercury(v); return; }
+    const dur = 1600;
+    function step(now) {
+      const t = Math.min(1, (now - animStart) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      shownValue = animFrom + (animTo - animFrom) * e;
+      setMercury(shownValue);
+      if (t < 1 && animTo === v) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  setMercury(0);
+
+  // ---- Countdown
+  function daysLeft() {
+    const ms = DEADLINE - new Date();
+    return Math.max(0, Math.ceil(ms / 86400000));
+  }
+
+  // ---- Render from deals
+  let deals = [];
+  let myId = null, isOwner = false;
+  let pendingDelete = null;
+  const freshIds = new Set();
+
+  function esc(s) { return String(s ?? ""); }
+  function ago(ms) {
+    const d = Date.now() - ms;
+    if (d < 60000) return "just now";
+    if (d < 3600000) return Math.floor(d / 60000) + " min ago";
+    if (d < 86400000) return Math.floor(d / 3600000) + " hr ago";
+    return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  function render() {
+    const total = deals.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const remaining = Math.max(0, GOAL - total);
+    const pct = Math.min(100, total / GOAL * 100);
+    $("total").textContent = fmt(total);
+    $("remainingText").textContent = remaining > 0 ? fmt(remaining) + " to go" : "Goal reached!";
+    $("barFill").style.width = pct + "%";
+    $("bulbPct").textContent = Math.floor(pct) + "%";
+    animateTo(total);
+    MILESTONES.forEach((m) => starEls[m].forEach((e) => e.classList.toggle("hit", total >= m)));
+
+    const days = daysLeft();
+    const weeks = Math.max(days / 7, 1 / 7);
+    $("days").textContent = days;
+    $("deadlineLeft").textContent = days + " days left";
+    $("perWeek").textContent = remaining > 0 ? fmt(remaining / weeks) : "$0";
+
+    const real = deals.filter((d) => d.rep);
+    $("dealCount").textContent = real.length;
+    $("avgDeal").textContent = real.length ? "avg " + fmt(real.reduce((s, d) => s + d.amount, 0) / real.length) : " ";
+
+    // Pace: compare to a straight line from Oct 1 to Dec 31
+    const start = new Date(2026, 9, 1), now = new Date();
+    const frac = Math.min(1, Math.max(0, (now - start) / (DEADLINE - start)));
+    const target = GOAL * frac;
+    const pace = $("pace");
+    pace.textContent = "";
+    if (total >= GOAL) {
+      pace.innerHTML = '<span class="pill ok">GOAL HIT</span>';
+    } else {
+      const pill = document.createElement("span");
+      const ahead = total >= target;
+      pill.className = "pill " + (ahead ? "ok" : "behind");
+      pill.textContent = ahead ? "ON PACE" : "BEHIND PACE";
+      pace.appendChild(pill);
+      pace.appendChild(document.createTextNode(" Straight-line target for today is " + fmt(target) + "."));
+    }
+
+    // Recent wins
+    const wins = $("wins");
+    wins.textContent = "";
+    const sorted = deals.slice().sort((a, b) => b.at - a.at);
+    if (!sorted.length) {
+      wins.innerHTML = '<li class="empty">No deals yet. Log the first one above.</li>';
+    }
+    sorted.slice(0, 10).forEach((d) => {
+      const li = document.createElement("li");
+      if (freshIds.has(d.id)) li.className = "fresh";
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = d.rep ? d.rep : (d.client || "Starting balance");
+      if (d.rep && d.client) {
+        const c = document.createElement("span");
+        c.className = "client";
+        c.textContent = " closed " + d.client;
+        who.appendChild(c);
+      }
+      const amt = document.createElement("span");
+      amt.className = "amt";
+      amt.textContent = "+" + fmt(d.amount);
+      const when = document.createElement("span");
+      when.className = "when";
+      when.appendChild(document.createTextNode(ago(d.at)));
+      if (canWrite && (isOwner || (myId && d.addedBy === myId))) {
+        const b = document.createElement("button");
+        b.type = "button";
+        const confirming = pendingDelete === d.id;
+        b.className = "linkbtn" + (confirming ? " danger" : "");
+        b.textContent = confirming ? "Click again to remove" : "Remove";
+        b.addEventListener("click", () => onRemove(d.id));
+        when.appendChild(b);
+      }
+      li.append(who, amt, when);
+      wins.appendChild(li);
+    });
+
+    // Leaderboard
+    const byRep = new Map();
+    real.forEach((d) => {
+      const key = d.rep.trim().toLowerCase();
+      const cur = byRep.get(key) || { name: d.rep.trim(), sum: 0, n: 0 };
+      cur.sum += d.amount; cur.n += 1;
+      byRep.set(key, cur);
+    });
+    const ranks = [...byRep.values()].sort((a, b) => b.sum - a.sum).slice(0, 8);
+    const board = $("board");
+    board.textContent = "";
+    if (!ranks.length) board.innerHTML = '<li class="empty">The first rep to close a deal takes the top spot.</li>';
+    const top = ranks[0] ? ranks[0].sum : 1;
+    ranks.forEach((r, i) => {
+      const li = document.createElement("li");
+      const rank = document.createElement("span"); rank.className = "rank"; rank.textContent = i + 1;
+      const nm = document.createElement("span"); nm.className = "bname"; nm.textContent = r.name + " ";
+      const cnt = document.createElement("span"); cnt.className = "client"; cnt.textContent = "(" + r.n + (r.n === 1 ? " deal)" : " deals)");
+      nm.appendChild(cnt);
+      const am = document.createElement("span"); am.className = "bamt"; am.textContent = fmt(r.sum);
+      const tr = document.createElement("span"); tr.className = "btrack";
+      const fill = document.createElement("i"); fill.style.width = (r.sum / top * 100) + "%";
+      tr.appendChild(fill);
+      li.append(rank, nm, am, tr);
+      board.appendChild(li);
+    });
+  }
+
+  // ---- Celebration
+  let bannerTimer = null;
+  function celebrate(d, before, after) {
+    const crossed = MILESTONES.filter((m) => before < m && after >= m);
+    $("bannerBig").textContent = crossed.length
+      ? (crossed.includes(GOAL) ? "WE HIT $15,000 MRR!" : "Milestone: " + fmt(crossed[crossed.length - 1]) + " MRR!")
+      : "New deal! +" + fmt(d.amount) + " MRR";
+    $("bannerSmall").textContent = (d.rep || "The team") + (d.client ? " closed " + d.client : " closed a deal") +
+      " · now at " + fmt(after);
+    const b = $("banner");
+    b.classList.add("show");
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => b.classList.remove("show"), crossed.length ? 9000 : 6000);
+    if (!reduceMotion && typeof confetti === "function") {
+      const colors = ["#d7261e", "#e6a417", "#ffffff", "#1d1a1a"];
+      confetti({ particleCount: crossed.length ? 220 : 120, spread: 80, origin: { y: 0.35 }, colors });
+      if (crossed.length) setTimeout(() => confetti({ particleCount: 160, angle: 60, spread: 70, origin: { x: 0, y: 0.6 }, colors }), 300);
+      if (crossed.length) setTimeout(() => confetti({ particleCount: 160, angle: 120, spread: 70, origin: { x: 1, y: 0.6 }, colors }), 500);
+    }
+  }
+
+  // ---- Form
+  let canWrite = false;
+  let dealsCol = null;
+  const form = $("addForm"), msg = $("formMsg"), submitBtn = $("submitBtn");
+  function setMsg(t, err) { msg.textContent = t; msg.className = "msg" + (err ? " err" : ""); }
+  try { const r = localStorage.getItem("thermo.rep"); if (r) $("rep").value = r; } catch (e) {}
+  document.querySelectorAll(".chip[data-amt]").forEach((c) =>
+    c.addEventListener("click", () => { $("amount").value = c.dataset.amt; $("amount").focus(); }));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!dealsCol || !canWrite) return;
+    const amount = Math.round(Number($("amount").value));
+    const rep = $("rep").value.trim();
+    const client = $("client").value.trim();
+    if (!amount || amount <= 0) { setMsg("Enter the MRR amount, like 500.", true); $("amount").focus(); return; }
+    if (amount > 15000) { setMsg("That's more than the whole goal. Double-check the amount (MRR, not total contract value).", true); return; }
+    if (!rep) { setMsg("Add the rep's name so they get credit.", true); $("rep").focus(); return; }
+    submitBtn.disabled = true;
+    setMsg("Adding…");
+    try {
+      const ref = dealsCol.doc();
+      await ref.set({ amount, rep, client, at: Date.now(), addedBy: myId || "" });
+      try { localStorage.setItem("thermo.rep", rep); } catch (err) {}
+      $("amount").value = ""; $("client").value = "";
+      setMsg("Added " + fmt(amount) + ". Nice work!");
+    } catch (err) {
+      if (err && err.code === "invalid_argument") {
+        canWrite = false; showReadOnly();
+      } else if (err && err.code === "quota_exceeded") {
+        setMsg("The deal log is full. Ask the page owner to clear old entries.", true);
+      } else {
+        setMsg("Couldn't save the deal. Check your connection and try again.", true);
+      }
+    } finally {
+      submitBtn.disabled = !canWrite;
+    }
+  });
+
+  async function onRemove(id) {
+    if (pendingDelete !== id) {
+      pendingDelete = id; render();
+      setTimeout(() => { if (pendingDelete === id) { pendingDelete = null; render(); } }, 4000);
+      return;
+    }
+    pendingDelete = null;
+    try { await dealsCol.doc(id).delete(); }
+    catch (err) { setMsg("Couldn't remove that deal. Try again.", true); }
+  }
+
+  function showReadOnly() {
+    $("addBlock").innerHTML = '<h2>Log a closed deal</h2><div class="note">You can watch the thermometer, but your access is view-only. Ask the page owner for Contributor access to log deals.</div>';
+  }
+  function showNoDb() {
+    $("addBlock").innerHTML = '<h2>Log a closed deal</h2><div class="note">Sign in to claude.ai to see the live team total and log deals.</div>';
+    $("wins").innerHTML = '<li class="empty">Live deals appear here once you are signed in.</li>';
+    $("board").innerHTML = '<li class="empty">Sign in to see the leaderboard.</li>';
+  }
+
+  // ---- Boot
+  render();
+  setInterval(() => { if (deals.length) render(); }, 60000);
+
+  (async () => {
+    if (!window.claude || !claude.use) { showNoDb(); return; }
+    const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+    if (!db) { showNoDb(); return; }
+    if (user) {
+      try { myId = await user.id(); } catch (e) {}
+      try { isOwner = await user.isOwner(); } catch (e) {}
+      let w = null;
+      try { w = await user.can("data.write"); } catch (e) {}
+      canWrite = w !== false;
+    } else {
+      canWrite = true;
+    }
+    dealsCol = db.collection("deals");
+    if (!canWrite) showReadOnly();
+    else { submitBtn.disabled = false; setMsg("Everyone watching sees it instantly."); }
+
+    let primed = false;
+    dealsCol.onSnapshot((snap) => {
+      const before = deals.reduce((s, d) => s + d.amount, 0);
+      deals = snap.docs.map((doc) => {
+        const x = doc.data() || {};
+        return { id: doc.id, amount: Number(x.amount) || 0, rep: String(x.rep || ""), client: String(x.client || ""), at: Number(x.at) || 0, addedBy: String(x.addedBy || "") };
+      });
+      const after = deals.reduce((s, d) => s + d.amount, 0);
+      if (primed) {
+        const added = snap.docChanges().filter((c) => c.type === "added").map((c) => deals.find((d) => d.id === c.doc.id)).filter(Boolean);
+        added.forEach((d) => { freshIds.add(d.id); setTimeout(() => freshIds.delete(d.id), 3000); });
+        const newest = added.sort((a, b) => b.at - a.at)[0];
+        if (newest && Date.now() - newest.at < 10 * 60000) celebrate(newest, before, after);
+      }
+      if (!snap.metadata.fromCache) primed = true;
+      render();
+    }, () => {
+      $("wins").innerHTML = '<li class="empty">Lost the live connection. Reload the page to reconnect.</li>';
+    });
+  })();
+})();
+</script>
